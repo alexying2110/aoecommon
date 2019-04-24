@@ -1,11 +1,12 @@
-#include "SPI.h"
-#include "TFT_22_ILI9225.h"
+#include <SPI.h>
+#include <TFT_22_ILI9225.h>
+#include <EEPROM.h>
 
 #define CLF 13
-#define SDA 11
-#define RS 10
-#define RST 9
-#define CS 8
+#define SDA 12
+#define RS 11
+#define RST 10
+#define CS 9
 #define LED 3
 #define BRIGHTNESS 200
 #define BUTTON 1
@@ -13,25 +14,29 @@
 #define XMAX 219
 
 TFT_22_ILI9225 tft = TFT_22_ILI9225(RST, RS, CS, LED, BRIGHTNESS);
-const int THICKNESS = 22;
+/* tbh these variables are assigned in setup/initGame already but i'm too scared to fix this right now */
+/* variables controlling pipe dimensions */
+const int THICCNESS = 22;
 const int GAP = 58;
+/* x and y of pipe 1 and 2 respectively */
 int xP1 = XMAX;
 int yP1 = random(GAP / 2 + 4, 150 - GAP / 2);
-int yP1Temp = yP1;
 int xP2 = XMAX * 3 / 2;
 int yP2 = random(GAP / 2 + 4, 150 - GAP / 2);
+/* temp variable for pipes about to be rendered */
+int yP1Temp = yP1;
 int yP2Temp = yP2;
-int yB = 50;
 int pipeRate = 1;
+/* bird height */
+int yB = 50;
 int fallRateInt = 0;
 float fallRate = 0;
 int score = 0;
 boolean held = false;
 boolean gameStarted = false;
-
 int pressed = 0;
 char buffer[3];
-
+int highScore;
 
 void drawBird(int y) {
   /* erase old */
@@ -42,8 +47,7 @@ void drawBird(int y) {
         tft.drawPixel(c, r, COLOR_TURQUOISE);
       }
     }
-  }
-  
+  }  
   if (fallRateInt >= 0) {
     yOld = y + 12 + fallRateInt;
     for (int r = y + 12; r <= yOld; r++) {
@@ -52,6 +56,7 @@ void drawBird(int y) {
       }
     }
   }
+  /* THE ACTUAL PIXEL ART */
   /* line 1 */
   tft.drawPixel(25, y, COLOR_TURQUOISE);
   tft.drawPixel(26, y, COLOR_TURQUOISE);
@@ -278,6 +283,7 @@ void drawPipe(int x, bool pipe1) {
     y1End = yP1Temp - GAP / 2;
     y2End = yP1Temp + GAP / 2;
   }
+  /* this is ugly but works */
   for (int c1 = x; c1 < xEnd; c1++) {
     if (c1 < 0) {
       c1 += XMAX + 1;
@@ -289,6 +295,7 @@ void drawPipe(int x, bool pipe1) {
         y2End = yP2 + GAP / 2;
       }
     }
+    /* slight optimizations to reduce number of pixels drawn and speed up game */
     for (int y1 = 0 + c1 % 4; y1 < y1End; y1 += 4) {
       tft.drawPixel(c1, y1, COLOR_DARKGREEN);
     }
@@ -296,8 +303,9 @@ void drawPipe(int x, bool pipe1) {
       tft.drawPixel(c1, y2, COLOR_DARKGREEN);
     }
   }
-  int xErase = x + pipeRate + THICKNESS;
-  for (int c2 = x + THICKNESS; c2 < xErase; c2++) {
+  /* erases old pipe line */
+  int xErase = x + pipeRate + THICCNESS;
+  for (int c2 = x + THICCNESS; c2 < xErase; c2++) {
     for (int y1 = 0 + c2 % 4; y1 < 150; y1 += 4) {
       tft.drawPixel(c2, y1, COLOR_TURQUOISE);
     }
@@ -311,8 +319,10 @@ void initGame() {
   tft.fillRectangle(0, 150, XMAX, 160, COLOR_DARKGREEN);
   tft.fillRectangle(0, 161, XMAX, YMAX, COLOR_SIENNA);
   tft.setBackgroundColor(COLOR_TURQUOISE);
-  tft.drawText(XMAX / 2 - 78, 80, "JUMP TO START", COLOR_WHITE);
-  tft.fillTriangle(XMAX / 2 + 69, 80, XMAX / 2 + 69, 93, XMAX / 2 + 80, 87, COLOR_WHITE);
+  tft.drawText(XMAX / 2 - 78, 50, "JUMP TO START", COLOR_WHITE);
+  tft.fillTriangle(XMAX / 2 + 69, 50, XMAX / 2 + 69, 63, XMAX / 2 + 80, 57, COLOR_WHITE);
+  tft.drawText(XMAX / 2 - 60, 88, "High Score:", COLOR_WHITE);
+  tft.drawText(XMAX / 2 - 8, 118, itoa(highScore, buffer, 10), COLOR_WHITE); 
   while (!gameStarted) {
     pressed = digitalRead(BUTTON);
     if (pressed == LOW) {
@@ -330,9 +340,17 @@ void endScreen() {
   tft.setBackgroundColor(COLOR_TURQUOISE);
   tft.fillRectangle(0, 0, XMAX, 149, COLOR_TURQUOISE);
   tft.fillRectangle(0, 161, XMAX, YMAX, COLOR_SIENNA);
-  tft.drawText(XMAX / 2 - 55, 50, "GAME OVER!", COLOR_WHITE);
-  tft.drawText(XMAX / 2 - 60, 88, "Your score:", COLOR_WHITE);
-  tft.drawText(XMAX / 2 - 8, 118, itoa(score, buffer, 10), COLOR_WHITE);
+  if (score > highScore) {
+    tft.drawText(XMAX / 2 - 55, 50, "GAME OVER!", COLOR_WHITE);
+    tft.drawText(XMAX / 2 - 60, 88, "Your Score:", COLOR_WHITE);
+    tft.drawText(XMAX / 2 - 8, 118, itoa(score, buffer, 10), COLOR_WHITE);
+  } else {
+    EEPROM.write(0, score);
+    tft.drawText(XMAX / 2 - 55, 30, "GAME OVER!", COLOR_WHITE);
+    tft.drawText(XMAX / 2 - 60, 68, "Your Score:", COLOR_WHITE);
+    tft.drawText(XMAX / 2 - 8, 98, itoa(score, buffer, 10), COLOR_WHITE);
+    tft.drawText(XMAX / 2 - 75, 118, "NEW HIGH SCORE!", COLOR_WHITE);
+  }
   while (true) {
     pressed = digitalRead(BUTTON);
     if (pressed == LOW) {
@@ -359,6 +377,7 @@ void setup() {
   pinMode(BUTTON, INPUT);
   tft.begin();
   tft.clear();
+  highScore = EEPROM.read(0);
   initGame();
 }
 
@@ -371,14 +390,14 @@ void loop() {
   if (xP1 == 0) {
     yP1 = random(GAP / 2 + 4, 150 - GAP / 2);
   }
-  if (xP1 < -THICKNESS) {
+  if (xP1 < -THICCNESS) {
     xP1 += XMAX + 1;
     yP1Temp = yP1;
   }
   if (xP2 == 0) {
     yP2 = random(GAP / 2 + 4, 150 - GAP / 2);
   }
-  if (xP2 < -THICKNESS) {
+  if (xP2 < -THICCNESS) {
     xP2 += XMAX + 1;
     yP2Temp = yP2;
   }
@@ -386,28 +405,34 @@ void loop() {
   fallRate += 0.32;
   fallRateInt = -int(fallRate);
   pressed = digitalRead(BUTTON);
-  if (xP1 + THICKNESS == 25 || xP2 + THICKNESS == 25) {
+  /* draw the score as infrequently as possible because it's expensive */
+  if (xP1 + THICCNESS == 25 || xP2 + THICCNESS == 25) {
     score++;
+    /* if score > 100 it goes up by 10 for whatever reason probaby because of the char buffer 
+     *  but idk how to fix that right now. I wonder where it will overflow
+     */
     tft.drawText(XMAX / 2 - 8, 161, itoa(score, buffer, 10), COLOR_WHITE);
   }
+  /* prevent holding */
   if (pressed == LOW && !held) {
     fallRate = -5;
     held = true;
   } else if (pressed == HIGH && held) {
     held = false;
   }
+  /* basic collision detection */
   if (yB <= -2) {
     endScreen();
   }
   if (yB >= 138) {
     endScreen();
   }
-  if (xP1 < 41 && xP1 + THICKNESS > 25) {
+  if (xP1 < 41 && xP1 + THICCNESS > 25) {
     if (yB < yP1 - GAP / 2 + 1 || yB + 12 > yP1 + GAP / 2 - 1) {
       endScreen();
     }
   }
-  if (xP2 < 42 && xP2 + THICKNESS > 24) {
+  if (xP2 < 42 && xP2 + THICCNESS > 24) {
     if (yB < yP2 - GAP / 2 + 1 || yB + 12 > yP2 + GAP / 2 - 1) {
       endScreen();
     }
