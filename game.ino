@@ -3,10 +3,10 @@
 #include <EEPROM.h>
 
 #define CLF 13
-#define SDA 12
-#define RS 11
-#define RST 10
-#define CS 9
+#define SDA 11
+#define RS 10
+#define RST 9
+#define CS 8
 #define LED 3
 #define BRIGHTNESS 200
 #define BUTTON 1
@@ -23,6 +23,7 @@ int xP1 = XMAX;
 int yP1 = random(GAP / 2 + 4, 150 - GAP / 2);
 int xP2 = XMAX * 3 / 2;
 int yP2 = random(GAP / 2 + 4, 150 - GAP / 2);
+#define RST 10
 /* temp variable for pipes about to be rendered */
 int yP1Temp = yP1;
 int yP2Temp = yP2;
@@ -318,6 +319,7 @@ void initGame() {
   tft.fillRectangle(0, 0, XMAX, 149, COLOR_TURQUOISE);
   tft.fillRectangle(0, 150, XMAX, 160, COLOR_DARKGREEN);
   tft.fillRectangle(0, 161, XMAX, YMAX, COLOR_SIENNA);
+  highScore = EEPROM.read(0);
   tft.setBackgroundColor(COLOR_TURQUOISE);
   tft.drawText(XMAX / 2 - 78, 50, "JUMP TO START", COLOR_WHITE);
   tft.fillTriangle(XMAX / 2 + 69, 50, XMAX / 2 + 69, 63, XMAX / 2 + 80, 57, COLOR_WHITE);
@@ -327,7 +329,7 @@ void initGame() {
     pressed = digitalRead(BUTTON);
     if (pressed == LOW) {
       gameStarted = true;
-      tft.fillRectangle(XMAX / 2 - 78, 80, XMAX / 2 + 80, 93, COLOR_TURQUOISE);
+      tft.fillRectangle(XMAX / 2 - 78, 50, XMAX / 2 + 80, 131, COLOR_TURQUOISE);
     }
   }
   tft.setBackgroundColor(COLOR_SIENNA);
@@ -341,15 +343,15 @@ void endScreen() {
   tft.fillRectangle(0, 0, XMAX, 149, COLOR_TURQUOISE);
   tft.fillRectangle(0, 161, XMAX, YMAX, COLOR_SIENNA);
   if (score > highScore) {
+    EEPROM.write(0, score);
+    tft.drawText(XMAX / 2 - 55, 30, "GAME OVER!", COLOR_WHITE);
+    tft.drawText(XMAX / 2 - 60, 62, "Your Score:", COLOR_WHITE);
+    tft.drawText(XMAX / 2 - 8, 88, itoa(score, buffer, 10), COLOR_WHITE);
+    tft.drawText(XMAX / 2 - 80, 118, "NEW HIGH SCORE!", COLOR_WHITE);
+  } else {
     tft.drawText(XMAX / 2 - 55, 50, "GAME OVER!", COLOR_WHITE);
     tft.drawText(XMAX / 2 - 60, 88, "Your Score:", COLOR_WHITE);
     tft.drawText(XMAX / 2 - 8, 118, itoa(score, buffer, 10), COLOR_WHITE);
-  } else {
-    EEPROM.write(0, score);
-    tft.drawText(XMAX / 2 - 55, 30, "GAME OVER!", COLOR_WHITE);
-    tft.drawText(XMAX / 2 - 60, 68, "Your Score:", COLOR_WHITE);
-    tft.drawText(XMAX / 2 - 8, 98, itoa(score, buffer, 10), COLOR_WHITE);
-    tft.drawText(XMAX / 2 - 75, 118, "NEW HIGH SCORE!", COLOR_WHITE);
   }
   while (true) {
     pressed = digitalRead(BUTTON);
