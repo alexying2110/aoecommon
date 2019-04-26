@@ -9,7 +9,7 @@
 #define CS 8
 #define LED 3
 #define BRIGHTNESS 200
-#define BUTTON 1
+#define KNOCK A0
 #define YMAX 175
 #define XMAX 219
 
@@ -18,6 +18,8 @@ TFT_22_ILI9225 tft = TFT_22_ILI9225(RST, RS, CS, LED, BRIGHTNESS);
 /* variables controlling pipe dimensions */
 const int THICCNESS = 22;
 const int GAP = 58;
+const float THRESHOLD = .1;
+const float ALPHA = .8;
 /* x and y of pipe 1 and 2 respectively */
 int xP1 = XMAX;
 int yP1 = random(GAP / 2 + 4, 150 - GAP / 2);
@@ -35,7 +37,8 @@ float fallRate = 0;
 int score = 0;
 boolean held = false;
 boolean gameStarted = false;
-int pressed = 0;
+float jump = 0;
+float baseline = 0;
 char buffer[3];
 int highScore;
 
@@ -326,8 +329,10 @@ void initGame() {
   tft.drawText(XMAX / 2 - 60, 88, "High Score:", COLOR_WHITE);
   tft.drawText(XMAX / 2 - 8, 118, itoa(highScore, buffer, 10), COLOR_WHITE); 
   while (!gameStarted) {
-    pressed = digitalRead(BUTTON);
-    if (pressed == LOW) {
+    jump = float(analogRead(KNOCK));
+    baseline = ALPHA * jump + (1 - ALPHA) * baseline;
+    Serial.println(jump/baseline);
+    if (jump < THRESHOLD * baseline) {
       gameStarted = true;
       tft.fillRectangle(XMAX / 2 - 78, 50, XMAX / 2 + 80, 131, COLOR_TURQUOISE);
     }
@@ -338,7 +343,7 @@ void initGame() {
 }
 
 void endScreen() {
-  pressed = HIGH;
+  jump = 0;
   tft.setBackgroundColor(COLOR_TURQUOISE);
   tft.fillRectangle(0, 0, XMAX, 149, COLOR_TURQUOISE);
   tft.fillRectangle(0, 161, XMAX, YMAX, COLOR_SIENNA);
@@ -354,8 +359,9 @@ void endScreen() {
     tft.drawText(XMAX / 2 - 8, 118, itoa(score, buffer, 10), COLOR_WHITE);
   }
   while (true) {
-    pressed = digitalRead(BUTTON);
-    if (pressed == LOW) {
+    jump = float(analogRead(KNOCK));
+    Serial.println(jump/baseline);
+    if (jump < THRESHOLD * baseline){
       break;
     }
   }
@@ -372,11 +378,11 @@ void endScreen() {
   fallRate = 0;
   score = 0;
   initGame();
+  held = true;
 }
 
 void setup() {
-  Serial.begin(8000);
-  pinMode(BUTTON, INPUT);
+  Serial.begin(9600);
   tft.begin();
   tft.clear();
   highScore = EEPROM.read(0);
@@ -406,7 +412,6 @@ void loop() {
   yB -= fallRateInt;
   fallRate += 0.32;
   fallRateInt = -int(fallRate);
-  pressed = digitalRead(BUTTON);
   /* draw the score as infrequently as possible because it's expensive */
   if (xP1 + THICCNESS == 25 || xP2 + THICCNESS == 25) {
     score++;
@@ -415,11 +420,13 @@ void loop() {
      */
     tft.drawText(XMAX / 2 - 8, 161, itoa(score, buffer, 10), COLOR_WHITE);
   }
-  /* prevent holding */
-  if (pressed == LOW && !held) {
+  jump = float(analogRead(KNOCK));
+  Serial.println(jump/baseline);
+  baseline = ALPHA * jump + (1 - ALPHA) * baseline;
+  if (jump < THRESHOLD * baseline && !held) {
     fallRate = -5;
     held = true;
-  } else if (pressed == HIGH && held) {
+  } else if (jump >= THRESHOLD * baseline && held) {
     held = false;
   }
   /* basic collision detection */
